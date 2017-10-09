@@ -6,7 +6,7 @@ import six
 from .. import logs
 from ..conf import settings
 from ..const import ARGUMENT_PLACEHOLDER
-from ..utils import DEVNULL, cache
+from ..utils import DEVNULL, cache, memoize
 from .generic import Generic
 
 
@@ -65,17 +65,25 @@ class Fish(Generic):
                 '  end\n'
                 'end').format(alias_name, alter_history, ARGUMENT_PLACEHOLDER)
 
-    def get_aliases(self):
+    def get_aliases_on_the_fly(self):
         overridden = self._get_overridden_aliases()
         functions = _get_functions(overridden)
         raw_aliases = _get_aliases(overridden)
         functions.update(raw_aliases)
         return functions
 
+    @memoize
+    def get_aliases(self):
+        if os.environ.get('TF_SHELL_ALIASES', ''):
+            raw_aliases = os.environ.get('TF_SHELL_ALIASES', '').split(chr(30))
+            return dict(self._parse_alias(alias)
+                        for alias in raw_aliases if alias and '=' in alias)
+        return self.get_aliases_on_the_fly()
+
     def _expand_aliases(self, command_script):
         aliases = self.get_aliases()
         binary = command_script.split(' ')[0]
-        if binary in aliases and aliases[binary] != binary:
+        if os.environ.get('TF_SHELL_ALIASES') and binary in aliases and aliases[binary] != binary:
             return command_script.replace(binary, aliases[binary], 1)
         elif binary in aliases:
             return u'fish -ic "{}"'.format(command_script.replace('"', r'\"'))
