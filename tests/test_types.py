@@ -43,6 +43,15 @@ class TestCorrectedCommand(object):
         out, _ = capsys.readouterr()
         assert out == printed
 
+    def test_run_with_edit(self, capsys, mocker):
+        script = "git branch"
+        command = CorrectedCommand(script, None, 1000).editable()
+        fcntl_mock = mocker.patch('thefuck.types.fcntl')
+        command.run(Command(script, ''))
+        out, _ = capsys.readouterr()
+        assert out == ""
+        assert fcntl_mock.ioctl.call_count == len(script)
+
 
 class TestRule(object):
     def test_from_path_rule_exception(self, mocker):

@@ -1,6 +1,8 @@
 from imp import load_source
+import fcntl
 import os
 import sys
+import termios
 from . import logs
 from .shells import shell
 from .conf import settings
@@ -213,6 +215,7 @@ class CorrectedCommand(object):
         self.script = script
         self.side_effect = side_effect
         self.priority = priority
+        self.id_editable = False
 
     def __eq__(self, other):
         """Ignores `priority` field."""
@@ -245,6 +248,18 @@ class CorrectedCommand(object):
         else:
             return self.script
 
+    def _edit_script(self):
+        """Replaces the command line with the script to be later edited by the
+        user."""
+        for c in self.script.encode():
+            fcntl.ioctl(sys.stdin, termios.TIOCSTI, bytes([c]))
+        sys.stderr.write("\n")  # avoid messing with the terminal prompt
+
+    def editable(self):
+        """Returns the command as editable"""
+        self.id_editable = True
+        return self
+
     def run(self, old_cmd):
         """Runs command from rule for passed command.
 
@@ -253,6 +268,9 @@ class CorrectedCommand(object):
         """
         if self.side_effect:
             self.side_effect(old_cmd, self.script)
+        if self.id_editable:
+            self._edit_script()
+            return
         if settings.alter_history:
             shell.put_to_history(self.script)
         # This depends on correct setting of PYTHONIOENCODING by the alias:
